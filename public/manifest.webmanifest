@@ -1,0 +1,11 @@
+{
+  "name": "WaveForce — gasket load planner",
+  "short_name": "WaveForce",
+  "description": "Reads a PRN, nests the gasket stacks, packs them into crates and loads the crates on the truck in 3D.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef1f4",
+  "theme_color": "#eef1f4",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

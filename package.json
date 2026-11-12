@@ -1,0 +1,31 @@
+{
+  "name": "waveforce",
+  "private": true,
+  "version": "3.2.0",
+  "description": "Gasket crating and truck loading in 3D: reads a PRN, nests the smaller gasket stacks inside the bigger ones, packs them into crates and loads the crates on the truck for the right centre of gravity.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:artifact": "vite build --mode artifact && node scripts/make-artifact.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "tune": "vite-node app/pack/tune.ts"
+  },
+  "dependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@types/three": "0.170.0",
+    "@vitejs/plugin-react": "4.5.2",
+    "typescript": "5.8.3",
+    "vite": "6.3.5",
+    "vite-plugin-singlefile": "2.2.0",
+    "vitest": "3.2.4"
+  }
+}
