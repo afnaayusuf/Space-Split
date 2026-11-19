@@ -14,7 +14,7 @@ const CLASSIC: Settings = {
   ...DEFAULTS,
   ...{ ring: 10, pile: 20, wall: 30, top: 40, sheet: 3, sheetEvery: 1, bow: 0, maxPile: 300, nestMax: 0 },
   ...{ crateMaxSide: 2300, crateMaxH: 1000, crateMaxKg: 2000, board: 22, skid: 100, lightKg: 0, skidKg: 0 },
-  ...{ square: false, stackSame: false, fill: 0, aspect: 0, onTop: 0, inch: false, card: 3, wallPct: 0, evenSplit: false },
+  ...{ square: false, stackSame: false, fill: 0, aspect: 0, onTop: 0, inch: false, card: 3, wallPct: 0, evenSplit: false, useSizes: false },
 };
 
 function line(id: string, od: number, bore: number, thk: number, qty: number, kg = 1): Line {
@@ -52,13 +52,19 @@ function check(plan: Plan, lines: Line[], s: Settings) {
   // crates: squares inside the walls and under the lid, apart from each other, smaller on bigger, sized to the deck
   for (const c of plan.crates) {
     const t = c.inner;
-    expect(c.outer.L).toBeCloseTo(t.L + 2 * (c.board ?? s.board), 3);
+    // a standard box is packed with its own clearances; a crate made to measure (or a custom one) with the crate's
+    const std = c.standard === true;
+    const wall = std ? (s.sizeGap ?? s.wall) : s.wall;
+    const pile = std ? (s.sizeGap ?? s.pile) : s.pile;
+    const top = std ? (s.sizeTop ?? s.top) : s.top;
+    if (!std) expect(c.outer.L).toBeCloseTo(t.L + 2 * (c.board ?? s.board), 3);
+    if (std) expect(s.crateSizes!.some((b) => Math.abs(b.L * 25.4 - c.outer.L) < E && Math.abs(b.W * 25.4 - c.outer.W) < E && Math.abs(b.H * 25.4 - c.outer.H) < E), `crate ${c.no} is a standard size`).toBe(true);
     for (const pg of c.groups) {
-      expect(pg.x).toBeGreaterThanOrEqual(s.wall - E);
-      expect(pg.y).toBeGreaterThanOrEqual(s.wall - E);
-      expect(pg.x + pg.group.side).toBeLessThanOrEqual(t.L - s.wall + E);
-      expect(pg.y + pg.group.side).toBeLessThanOrEqual(t.W - s.wall + E);
-      expect(pg.z + pg.group.h).toBeLessThanOrEqual(t.H - s.top + E);
+      expect(pg.x).toBeGreaterThanOrEqual(wall - E);
+      expect(pg.y).toBeGreaterThanOrEqual(wall - E);
+      expect(pg.x + pg.group.side).toBeLessThanOrEqual(t.L - wall + E);
+      expect(pg.y + pg.group.side).toBeLessThanOrEqual(t.W - wall + E);
+      expect(pg.z + pg.group.h).toBeLessThanOrEqual(t.H - top + E);
     }
     for (let i = 0; i < c.groups.length; i++)
       for (let j = i + 1; j < c.groups.length; j++) {
@@ -67,10 +73,10 @@ function check(plan: Plan, lines: Line[], s: Settings) {
         const overlapZ = a.z < b.z + b.group.h - E && b.z < a.z + a.group.h - E;
         if (!overlapZ) continue;
         const apart =
-          a.x + a.group.side + s.pile <= b.x + E ||
-          b.x + b.group.side + s.pile <= a.x + E ||
-          a.y + a.group.side + s.pile <= b.y + E ||
-          b.y + b.group.side + s.pile <= a.y + E;
+          a.x + a.group.side + pile <= b.x + E ||
+          b.x + b.group.side + pile <= a.x + E ||
+          a.y + a.group.side + pile <= b.y + E ||
+          b.y + b.group.side + pile <= a.y + E;
         expect(apart, `crate ${c.no}`).toBe(true);
       }
     for (const pg of c.groups.filter((q) => q.z > E)) {
@@ -85,10 +91,9 @@ function check(plan: Plan, lines: Line[], s: Settings) {
     expect(Math.abs(c.cog.y)).toBeLessThanOrEqual(c.outer.W / 2);
     expect(c.cog.z).toBeGreaterThan(0);
     expect(c.cog.z).toBeLessThan(c.outer.H);
-    if (c.groups.length > 1) {
-      expect(c.net).toBeLessThanOrEqual(s.crateMaxKg + E);
-      expect(t.H).toBeLessThanOrEqual(s.crateMaxH + step + E);
-    }
+    if (c.groups.length > 1) expect(c.net).toBeLessThanOrEqual(s.crateMaxKg + E);
+    if (std) continue; // a standard size is what it is: the rest is how a crate made to measure is sized
+    if (c.groups.length > 1) expect(t.H).toBeLessThanOrEqual(s.crateMaxH + step + E);
     expect(t.L).toBeLessThanOrEqual(Math.max(s.crateMaxSide, c.cell + 2 * s.wall) + step + E);
     // made to measure: no more than one cell of slack round the squares
     const xs = c.groups.filter((q) => q.z <= E);
@@ -193,7 +198,8 @@ describe('planner', () => {
       const width = Math.max(8, Math.round(od * (0.03 + rnd() * 0.25)));
       lines.push(line(`l${i}`, od, od - 2 * width, rnd() < 0.5 ? 2.14 : 4.5, 1 + Math.floor(rnd() ** 3 * 120), +(od * 0.002).toFixed(3)));
     }
-    for (const [base, stacking] of [[CLASSIC, 'never'], [CLASSIC, 'always'], [DEFAULTS, 'never'], [DEFAULTS, 'always'], [DEFAULTS, 'auto']] as const) {
+    const MADE = { ...DEFAULTS, useSizes: false };
+    for (const [base, stacking] of [[CLASSIC, 'never'], [CLASSIC, 'always'], [MADE, 'never'], [MADE, 'always'], [MADE, 'auto'], [DEFAULTS, 'never'], [DEFAULTS, 'always'], [DEFAULTS, 'auto']] as const) {
       const s = { ...base, stacking };
       const plan = makePlan(lines, s);
       check(plan, lines, s);

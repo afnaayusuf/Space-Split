@@ -10,13 +10,20 @@
  * formulas) is written by scripts/scorecard.py.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { DEFAULTS } from '../app/model/presets';
+import { CRATE_SIZES, DEFAULTS } from '../app/model/presets';
 import type { Crate } from '../app/model/types';
 import data from '../app/pack/history.json';
 import { cratesFor, orderLines, scoreOrder, type Order } from '../app/pack/history';
 
 const IN = 25.4;
 const orders = (data as unknown as Order[]).filter((o) => o.split !== 'excluded');
+
+// each order as if it were new: its own box sizes off the standard list, unless another order used the same size
+const key = (b: { L: number; W: number; H: number }) => `${b.L}x${b.W}x${b.H}`;
+const sizesOf = (o: Order) => new Set(o.boxes.filter((b) => b.L).map((b) => key({ L: b.L, W: b.B, H: b.H })));
+const used = new Map<string, number>();
+for (const o of orders) for (const k of sizesOf(o)) used.set(k, (used.get(k) ?? 0) + 1);
+const asNew = (o: Order) => scoreOrder(o, { ...DEFAULTS, crateSizes: CRATE_SIZES.filter((b) => !sizesOf(o).has(key(b)) || used.get(key(b))! > 1) }).score;
 
 const range = (t: string) => {
   const [a, b] = t.split('-').map(Number);
@@ -51,7 +58,7 @@ const out = orders.map((o) => {
     .filter((b) => readBoxes.has(b.no) || !named.has(b.no))
     .map((b) => ({ no: b.no, ...sorted(b.L, b.B, b.H), kg: b.kg, pcs: b.pcs }))
     .sort((a, b) => vol(b) - vol(a));
-  const plan = crates.map((c) => ({ no: c.no, ...inches(c), kg: Math.round(c.gross * 10) / 10, pcs: c.groups.reduce((n, g) => n + g.group.piles.reduce((m, p) => m + p.n, 0), 0) })).sort((a, b) => vol(b) - vol(a));
+  const plan = crates.map((c) => ({ no: c.no, kind: c.standard === true ? 'Standard' : c.standard === false ? 'Custom' : 'Made to measure', ...inches(c), kg: Math.round(c.gross * 10) / 10, pcs: c.groups.reduce((n, g) => n + g.group.piles.reduce((m, p) => m + p.n, 0), 0) })).sort((a, b) => vol(b) - vol(a));
   const n = Math.max(real.length, plan.length);
   const pairs = Array.from({ length: n }, (_, i) => ({ real: real[i] ?? null, plan: plan[i] ?? null }));
   const score = n ? (100 * pairs.reduce((a, p) => a + (p.real && p.plan ? fit(p.real, p.plan) : 0), 0)) / n : 0;
@@ -94,10 +101,11 @@ const out = orders.map((o) => {
     split: o.split,
     pairs: pairs.map((p) => ({
       real: p.real && { no: p.real.no, L: p.real.L, B: p.real.B, H: p.real.H, kg: p.real.kg, pcs: p.real.pcs },
-      plan: p.plan && { no: p.plan.no, L: p.plan.L, B: p.plan.B, H: p.plan.H, kg: p.plan.kg, pcs: p.plan.pcs },
+      plan: p.plan && { no: p.plan.no, kind: p.plan.kind, L: p.plan.L, B: p.plan.B, H: p.plan.H, kg: p.plan.kg, pcs: p.plan.pcs },
     })),
     lines: lineRows,
     score,
+    asNew: DEFAULTS.useSizes ? asNew(o) : null,
   };
 });
 

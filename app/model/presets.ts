@@ -37,6 +37,21 @@ export const VEHICLES: Vehicle[] = [
  * with `npm run tune`, except the 300 kg box limit, the works' written rule,
  * which the history neither needs nor contradicts.
  */
+/**
+ * Standard crate sizes (outside, inches, long side first): every box size on
+ * the works' signed packing check lists (pack/history.json), smallest first.
+ * With "Standard sizes" on, crates are picked from this list.
+ */
+export const CRATE_SIZES: { L: number; W: number; H: number }[] = [
+  { L: 4, W: 4, H: 4 }, { L: 4, W: 4, H: 9 }, { L: 5.5, W: 5.5, H: 7 }, { L: 5, W: 5, H: 11 }, { L: 9, W: 9, H: 4 },
+  { L: 16, W: 16, H: 2 }, { L: 16, W: 16, H: 3 }, { L: 12, W: 12, H: 5.5 }, { L: 24, W: 24, H: 2 }, { L: 14, W: 14, H: 10 },
+  { L: 32, W: 32, H: 2 }, { L: 14, W: 14, H: 11 }, { L: 36, W: 36, H: 2 }, { L: 17, W: 17, H: 11.5 }, { L: 19, W: 19, H: 11 },
+  { L: 21, W: 21, H: 10 }, { L: 24, W: 24, H: 12 }, { L: 35, W: 35, H: 8 }, { L: 31, W: 31, H: 11 }, { L: 29, W: 29, H: 14 },
+  { L: 35, W: 35, H: 12 }, { L: 39, W: 39, H: 11 }, { L: 35, W: 35, H: 16 }, { L: 41, W: 41, H: 12 }, { L: 39, W: 39, H: 16 },
+  { L: 47, W: 47, H: 14 }, { L: 43, W: 43, H: 22 }, { L: 49, W: 49, H: 18 }, { L: 42, W: 42, H: 26 }, { L: 55, W: 55, H: 16 },
+  { L: 85, W: 85, H: 11 }, { L: 67, W: 67, H: 20 }, { L: 71, W: 71, H: 21 }, { L: 85, W: 85, H: 16 }, { L: 79, W: 79, H: 23 },
+];
+
 export const DEFAULTS: Settings = {
   ring: 15,
   pile: 10,
@@ -65,6 +80,12 @@ export const DEFAULTS: Settings = {
   inch: true,
   wallPct: 0,
   evenSplit: false,
+  useSizes: true,
+  crateSizes: CRATE_SIZES,
+  sizeWall: 3,
+  sizeBase: 10,
+  sizeGap: 3,
+  sizeTop: 15,
   deckWall: 50,
   deckGap: 40,
   deckTop: 100,

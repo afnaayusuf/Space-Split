@@ -1,5 +1,6 @@
 import type { Crate, FleetOption, Line, Load, Plan, Settings, Vehicle } from '../model/types';
 import { packCrates } from './crates';
+import { packStandard } from './sizes';
 import { loadCrates, space, type LoadResult } from './load';
 import { makePiles, nest } from './nest';
 
@@ -69,7 +70,7 @@ export function makePlan(lines: Line[], s: Settings): Plan {
   const vehicle = s.vehicles.find((v) => v.id === s.vehicleId) ?? s.vehicles[0];
   // crates are sized for the deck they go on; on Auto, for the widest deck on the list
   const deckW = auto ? Math.max(...s.vehicles.map((v) => space(v, s).W)) : space(vehicle, s).W;
-  const crates = packCrates(groups, s, deckW);
+  const crates = s.useSizes && s.crateSizes?.length ? packStandard(groups, s, deckW, s.crateSizes) : packCrates(groups, s, deckW);
   let fleet: FleetOption[] = [];
   let mixed: string | null = null;
   let res: LoadResult;
@@ -90,6 +91,11 @@ export function makePlan(lines: Line[], s: Settings): Plan {
     const n = loads.length - (mixed ? 1 : 0);
     notes.push(`Vehicles picked on Auto: ${n} × ${main}${mixed ? ` and 1 × ${mixed} for the last crates` : ''}.`);
   }
+  const custom = crates.filter((c) => c.standard === false);
+  if (custom.length)
+    notes.push(
+      `${custom.length} ${custom.length === 1 ? 'crate fits' : 'crates fit'} no standard size and ${custom.length === 1 ? 'is' : 'are'} made to measure (Custom): crate ${custom.map((c) => c.no).join(', ')}.`,
+    );
   const heavy = crates.filter((c) => c.net > s.crateMaxKg).length;
   if (heavy) notes.push(`${heavy} ${heavy === 1 ? 'crate holds' : 'crates hold'} more than ${s.crateMaxKg} kg: one stack is heavier than the crate limit.`);
   const tall = crates.filter((c) => c.inner.H > s.crateMaxH).length;

@@ -1,6 +1,7 @@
 import type { Crate, Line, Settings } from '../model/types';
 import { readPrn } from '../parse/readPrn';
 import { packCrates } from './crates';
+import { packStandard } from './sizes';
 import { space } from './load';
 import { makePiles, nest } from './nest';
 
@@ -88,7 +89,7 @@ export function cratesFor(lines: Line[], s: Settings): Crate[] {
   const piles = makePiles(lines, s);
   const groups = nest(piles, s);
   const deckW = Math.max(...s.vehicles.map((v) => space(v, s).W));
-  return packCrates(groups, s, deckW);
+  return s.useSizes && s.crateSizes?.length ? packStandard(groups, s, deckW, s.crateSizes) : packCrates(groups, s, deckW);
 }
 
 /**

@@ -99,8 +99,10 @@ function descend(start: Settings, set: Order[], minGain: number): { s: Settings;
 }
 
 // 3.1's made-to-measure settings, before any tuning
+// these settings size crates made to measure; standard sizes have their own allowances (history.test.ts)
 const UNTUNED: Settings = {
   ...DEFAULTS,
+  useSizes: false,
   ...{ ring: 10, pile: 20, wall: 30, top: 40, sheet: 3, sheetEvery: 1, card: 3, bow: 0, maxPile: 300, nestMax: 0 },
   ...{ crateMaxSide: 2300, crateMaxH: 1000, crateMaxKg: 2000, board: 22, skid: 100, lightKg: 0, skidKg: 0, lightBoard: 22 },
   ...{ square: false, stackSame: false, evenSplit: false, fill: 0, aspect: 0, onTop: 0, inch: false, wallPct: 0 },
@@ -145,7 +147,7 @@ for (const gain of GAINS) {
   console.log(`cross-validation, min gain ${gain}: ${mean.toFixed(1)}  (folds ${scores.map((x) => x.toFixed(0)).join(' ')})`);
 }
 const gain = cv.reduce((a, b) => (b.score > a.score + 1e-9 ? b : a)).gain;
-const tuned = tune(train, gain, RESTARTS * 2, [DEFAULTS]);
+const tuned = tune(train, gain, RESTARTS * 2, [{ ...DEFAULTS, useSizes: false }]);
 console.log(`\nmin gain ${gain}; ${trials} trials in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 
 const pick = (s: Settings) => Object.fromEntries(KNOBS.map((k) => [k, s[k]]));

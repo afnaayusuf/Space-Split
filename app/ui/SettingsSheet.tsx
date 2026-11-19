@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DEFAULTS } from '../model/presets';
+import { CRATE_SIZES, DEFAULTS } from '../model/presets';
 import type { Settings, Vehicle } from '../model/types';
 import { pickFile } from './files';
 import { Icon } from './icons';
@@ -20,6 +20,48 @@ function Num({ value, onChange, label, unit, min = 0, step }: { value: number; o
         <input inputMode="decimal" value={text} step={step} onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()} aria-label={label} />
         {unit && <i>{unit}</i>}
       </span>
+    </label>
+  );
+}
+
+type Size = { L: number; W: number; H: number };
+const fmt = (v: number) => (Number.isInteger(v) ? String(v) : String(+v.toFixed(2)));
+const sizesText = (list: Size[]) => list.map((b) => `${fmt(b.L)} x ${fmt(b.W)} x ${fmt(b.H)}`).join('\n');
+
+/** Reads one size a line ("16 x 16 x 3", "16×16×3", "16 16 3"), long side first; lines it cannot read are reported. */
+export function readSizes(text: string): { sizes: Size[]; bad: string[] } {
+  const sizes: Size[] = [];
+  const bad: string[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const t = raw.trim();
+    if (!t) continue;
+    const n = t.split(/\s*[x×*,]\s*|\s+/i).map(Number);
+    if (n.length === 3 && n.every((v) => Number.isFinite(v) && v > 0)) {
+      const [L, W] = [n[0], n[1]].sort((a, b) => b - a);
+      sizes.push({ L, W, H: n[2] });
+    } else bad.push(t);
+  }
+  sizes.sort((a, b) => a.L * a.W * a.H - b.L * b.W * b.H);
+  return { sizes, bad };
+}
+
+/** The standard sizes as text, one a line; read when the box loses focus. */
+function SizeList({ value, onChange }: { value: Size[]; onChange: (v: Size[]) => void }) {
+  const [text, setText] = useState(sizesText(value));
+  const [bad, setBad] = useState<string[]>([]);
+  useEffect(() => setText(sizesText(value)), [value]);
+  const commit = () => {
+    const r = readSizes(text);
+    setBad(r.bad);
+    if (r.sizes.length && sizesText(r.sizes) !== sizesText(value)) onChange(r.sizes);
+  };
+  return (
+    <label className="sizes-field">
+      <span>
+        Sizes, outside, inches · one a line: length x width x height · {value.length} sizes
+      </span>
+      <textarea value={text} rows={8} spellCheck={false} onChange={(e) => setText(e.target.value)} onBlur={commit} aria-label="Standard crate sizes" />
+      {bad.length > 0 && <em className="sizes-bad">Not read: {bad.join(' · ')}</em>}
     </label>
   );
 }
@@ -85,6 +127,28 @@ export function SettingsSheet({ settings, onChange, onClose, truckName, onTruckF
               <Num label="Nest in bores up to" unit="mm OD" value={s.nestMax} onChange={(nestMax) => set({ nestMax })} />
             </div>
             <Toggle label="Nest small stacks inside bigger ones" on={s.nest} onChange={(nest) => set({ nest })} />
+          </section>
+
+          <section>
+            <h3>Crates · standard sizes</h3>
+            <Toggle label="Pick crates from the standard sizes" on={!!s.useSizes} onChange={(useSizes) => set({ useSizes })} />
+            {s.useSizes && (
+              <>
+                <p className="muted small">
+                  Each crate is the smallest size on the list that takes its gaskets. A crate no size takes is made to measure, with the settings below, and marked <b>Custom</b>.
+                </p>
+                <div className="grid2">
+                  <Num label="Box side" unit="mm" step={1} value={s.sizeWall ?? 3} onChange={(sizeWall) => set({ sizeWall })} />
+                  <Num label="Floor and lid" unit="mm" step={1} value={s.sizeBase ?? 10} onChange={(sizeBase) => set({ sizeBase })} />
+                  <Num label="Between stacks and to the side" unit="mm" step={1} value={s.sizeGap ?? 3} onChange={(sizeGap) => set({ sizeGap })} />
+                  <Num label="Under the lid" unit="mm" step={1} value={s.sizeTop ?? 15} onChange={(sizeTop) => set({ sizeTop })} />
+                </div>
+                <SizeList value={s.crateSizes ?? CRATE_SIZES} onChange={(crateSizes) => set({ crateSizes })} />
+                <button type="button" className="btn ghost" onClick={() => set({ crateSizes: CRATE_SIZES })}>
+                  Back to the works' sizes
+                </button>
+              </>
+            )}
           </section>
 
           <section>

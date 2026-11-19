@@ -138,6 +138,15 @@ What the history taught (each one a setting, explained in Help):
 Large Series B spiral wound (ASME B16.47 B, class 150, 26–36″) are read from the
 ASME B16.20 sizes; they are not on the works' chart, so check them and add weights.
 
+**Standard crate sizes.** Crates are picked from a list of standard sizes (Settings →
+Crates · standard sizes; it starts as every box size on the packing check lists), so the
+crate makers build the same boxes again and again. Each crate is the smallest size on the
+list that takes its gaskets; a gasket no size takes gets a crate made to measure, marked
+**Custom** in the plan. The box allowances (side 3 mm, floor and lid 10 mm, 3 mm between
+stacks, 15 mm under the lid) were calibrated on the train orders only. With standard sizes
+the history scores 66.4 (train) and 47.9 (test); with each order's own sizes taken off the
+list, as for a new order, 45.4 and 44.2. Switch it off for crates made to measure.
+
 **Vehicle type.** The list holds the common Indian bodies (Tata Ace, pickup,
 Tata 407, 14 / 17 / 19 / 20 / 22 / 24 ft, 32 ft SXL / MXL, 20 / 40 ft
 container, 40 ft trailer) at typical sizes. On **Auto** every type is tried and

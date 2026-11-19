@@ -78,6 +78,13 @@ export interface Settings {
   inch: boolean; // outside sizes rounded up to whole inches
   wallPct: number; // wall clearance, both sides together, at least this share of the largest square's side
   evenSplit: boolean; // squares of a size needing several crates are shared out evenly
+  /** Standard crate sizes: crates are picked from this list (outside, inches) instead of made to measure. */
+  useSizes?: boolean;
+  crateSizes?: { L: number; W: number; H: number }[];
+  sizeWall?: number; // a standard box's side, each side (mm)
+  sizeBase?: number; // a standard box's floor and lid together (mm)
+  sizeGap?: number; // in a standard box: between stacks and to the walls (mm)
+  sizeTop?: number; // in a standard box: above the tallest stack (mm)
   /** On the vehicle. */
   deckWall: number;
   deckGap: number;
@@ -159,6 +166,8 @@ export interface Crate {
   cog: { x: number; y: number; z: number };
   stack: boolean; // other crates may stand on it
   rotate: boolean; // may turn a quarter on the deck
+  /** Picked from the standard sizes (true), or made to measure because none would take it (false); missing when standard sizes are off. */
+  standard?: boolean;
 }
 
 export interface Placement {
