@@ -19,11 +19,15 @@ function open(): Promise<IDBDatabase> {
 export async function loadFile(key: string): Promise<StoredFile | null> {
   try {
     const db = await open();
-    return await new Promise((resolve, reject) => {
-      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
-      req.onsuccess = () => resolve((req.result as StoredFile | undefined) ?? null);
-      req.onerror = () => reject(req.error);
-    });
+    try {
+      return await new Promise((resolve, reject) => {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
+        req.onsuccess = () => resolve((req.result as StoredFile | undefined) ?? null);
+        req.onerror = () => reject(req.error);
+      });
+    } finally {
+      db.close();
+    }
   } catch {
     return null;
   }
@@ -33,12 +37,20 @@ export async function loadFile(key: string): Promise<StoredFile | null> {
 export async function saveFile(key: string, file: StoredFile | null): Promise<boolean> {
   try {
     const db = await open();
-    return await new Promise((resolve) => {
-      const store = db.transaction(STORE, 'readwrite').objectStore(STORE);
-      const req = file ? store.put(file, key) : store.delete(key);
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => resolve(false);
-    });
+    try {
+      return await new Promise((resolve) => {
+        // a write only counts once the transaction commits: a full disk shows up as an abort, after the request succeeded
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        if (file) store.put(file, key);
+        else store.delete(key);
+        tx.oncomplete = () => resolve(true);
+        tx.onabort = () => resolve(false);
+        tx.onerror = () => resolve(false);
+      });
+    } finally {
+      db.close();
+    }
   } catch {
     return false;
   }

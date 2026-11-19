@@ -29,12 +29,21 @@ function write(key: string, value: unknown): boolean {
     else localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch {
+    // too big to keep: drop the older copy too, or the next launch would open it as if it were this one
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* storage unavailable */
+    }
     return false;
   }
 }
 
 /** Crate settings as 3.1 shipped them, before they were tuned to the works' history. */
 const EARLIER_DEFAULTS: Record<string, unknown> = { ring: 10, pile: 20, wall: 30, top: 40, sheet: 3, maxPile: 300, crateMaxSide: 2300, crateMaxH: 1000, crateMaxKg: 2000, board: 22, skid: 100 };
+
+/** Saved settings carry this, so the upgrade from the 3.1 defaults runs once and never resets a value chosen later. */
+const SETTINGS_VERSION = 2;
 
 /** Settings as saved, with anything missing (a newer version's fields) from the defaults and anything dropped left out. */
 export function loadSettings(): Settings {
@@ -43,8 +52,8 @@ export function loadSettings(): Settings {
   const defaults = DEFAULTS as unknown as Record<string, unknown>;
   const out: Record<string, unknown> = { ...defaults };
   for (const k of Object.keys(defaults)) if (k in s && typeof s[k] === typeof defaults[k]) out[k] = s[k];
-  // a value still at an earlier version's default moves to today's (tuned to the works' packing history)
-  for (const [k, was] of Object.entries(EARLIER_DEFAULTS)) if (s[k] === was) out[k] = defaults[k];
+  // settings saved before the tuned defaults: a value still at the old default moves to today's
+  if (!(Number(s.version) >= SETTINGS_VERSION)) for (const [k, was] of Object.entries(EARLIER_DEFAULTS)) if (s[k] === was) out[k] = defaults[k];
   // the vehicle list is the current catalogue, with the user's edits to any type kept by id
   const saved = new Map((Array.isArray(s.vehicles) ? (s.vehicles as Vehicle[]) : []).map((v) => [v.id, v]));
   out.vehicles = DEFAULTS.vehicles.map((v) => ({ ...v, ...(saved.get(v.id) ?? {}) }));
@@ -52,7 +61,7 @@ export function loadSettings(): Settings {
   return out as unknown as Settings;
 }
 
-export const saveSettings = (s: Settings) => write(KEY_SETTINGS, s);
+export const saveSettings = (s: Settings) => write(KEY_SETTINGS, { ...s, version: SETTINGS_VERSION });
 
 export function loadJob(): Job | null {
   const j = read<Job>(KEY_JOB);
