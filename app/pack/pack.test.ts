@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DEFAULTS } from '../model/presets';
-import type { Line, Plan, Settings } from '../model/types';
+import { DEFAULTS, VEHICLES } from '../model/presets';
+import type { Crate, Line, Plan, Settings } from '../model/types';
 import { readPrn } from '../parse/readPrn';
 import { readSheets } from '../parse/sheet';
+import { loadCrates } from './load';
 import { makePlan } from './plan';
 
 const E = 0.5; // mm of rounding allowed
@@ -93,6 +94,12 @@ function check(plan: Plan, lines: Line[], s: Settings) {
     const xs = c.groups.filter((q) => q.z <= E);
     expect(Math.max(...xs.map((q) => q.x + q.group.side)) + s.wall).toBeGreaterThan(t.L - c.cell - step - E);
   }
+
+  // every crate is loaded exactly once or listed as left behind: none lost, none twice
+  const times = new Map<string, number>();
+  for (const l of plan.loads) for (const p of l.placed) times.set(p.crate, (times.get(p.crate) ?? 0) + 1);
+  const left = new Set(plan.stranded.map((x) => x.crate));
+  for (const c of plan.crates) expect((times.get(c.id) ?? 0) + (left.has(c.id) ? 1 : 0), `crate ${c.id}`).toBe(1);
 
   // vehicles: inside the load space, no two crates in the same space, only the two stacking rules
   const byId = new Map(plan.crates.map((c) => [c.id, c]));
@@ -278,4 +285,37 @@ describe('planner', () => {
       if (widest + 2 * DEFAULTS.wall + 2 * DEFAULTS.board < 2340) expect(plan.stranded, plan.stranded.map((x) => x.why).join('; ')).toHaveLength(0);
     }
   }, 60000);
+});
+
+describe('loading', () => {
+  const crate = (id: string, L: number, W: number, H: number, kg: number) =>
+    ({ id, no: 0, name: id, cell: 0, a: 1, b: 1, inner: { L, W, H }, outer: { L, W, H }, board: 22, skid: 0, groups: [], net: kg, tare: 0, gross: kg, fill: 0, cog: { x: 0, y: 0, z: H / 2 }, stack: true, rotate: true }) as unknown as Crate;
+  const tally = (r: ReturnType<typeof loadCrates>, crates: Crate[]) => {
+    const times = new Map<string, number>();
+    for (const l of r.loads) for (const p of l.placed) times.set(p.crate, (times.get(p.crate) ?? 0) + 1);
+    for (const x of r.stranded) times.set(x.crate, (times.get(x.crate) ?? 0) + 1);
+    return crates.map((c) => times.get(c.id) ?? 0);
+  };
+
+  it('never bridges with a crate already under another bridge', () => {
+    const s = { ...DEFAULTS, stacking: 'always', bridge: true, tiers: 2 } as Settings;
+    const v = VEHICLES.find((x) => x.id === 'tr40')!;
+    // A1–A4 make the platform B0 bridges; A4, the lightest of its size, must not then also ride on C1–C4
+    const crates = [
+      crate('A0', 500, 500, 600, 200),
+      ...[1, 2, 3, 4].map((i) => crate(`A${i}`, 500, 500, 400, 150 - i)),
+      crate('B0', 900, 900, 400, 100),
+      ...[1, 2, 3, 4].map((i) => crate(`C${i}`, 400, 400, 400, 120)),
+    ];
+    expect(tally(loadCrates(crates, v, s), crates)).toEqual(crates.map(() => 1));
+  });
+
+  it('keeps every vehicle within its payload, rows and towers included', () => {
+    const s = { ...DEFAULTS, stacking: 'always', tiers: 2 } as Settings;
+    const v = VEHICLES.find((x) => x.id === 'ace')!;
+    const crates = [1, 2, 3, 4].map((i) => crate(`P${i}`, 600, 600, 500, 300));
+    const r = loadCrates(crates, v, s);
+    for (const l of r.loads) expect(l.kg).toBeLessThanOrEqual(v.payload);
+    expect(tally(r, crates)).toEqual(crates.map(() => 1));
+  });
 });

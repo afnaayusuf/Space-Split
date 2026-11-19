@@ -89,7 +89,7 @@ export const targetX = (v: Vehicle) => (v.front.x * v.front.max + v.rear.x * v.r
  * under it. A crate holding a non-stackable gasket carries nothing: it stands
  * alone, or goes on top. One holding a non-rotatable line keeps its way round.
  */
-function makeUnits(crates: Crate[], sp: Space, s: Settings, stack: boolean): Unit[] {
+function makeUnits(crates: Crate[], sp: Space, s: Settings, stack: boolean, payload: number): Unit[] {
   if (!stack) return crates.map(single);
   const foot = (c: Crate) => `${Math.round(c.outer.L)}x${Math.round(c.outer.W)}`;
   const pools = new Map<string, Crate[]>();
@@ -113,6 +113,9 @@ function makeUnits(crates: Crate[], sp: Space, s: Settings, stack: boolean): Uni
     lonely.push(...alone);
     lonely.sort((a, b) => b.outer.L * b.outer.W - a.outer.L * a.outer.W);
     for (const top of lonely) {
+      // a crate already taken into a platform under an earlier bridge is no longer free to ride on top
+      const own = top.stack ? pools.get(foot(top))! : alone;
+      if (!own.includes(top)) continue;
       let best: { pool: Crate[]; four: Crate[]; bL: number; bW: number; turned: boolean } | null = null;
       for (const [k, pool] of pools) {
         if (k === foot(top)) continue;
@@ -127,7 +130,7 @@ function makeUnits(crates: Crate[], sp: Space, s: Settings, stack: boolean): Uni
         const bW = 2 * b.W + s.deckGap;
         if (bL > sp.L + E || bW > sp.W + E) continue;
         const under = four.reduce((a, c) => a + c.gross, 0);
-        if (top.gross > under / 2) continue;
+        if (top.gross > under / 2 || under + top.gross > payload + E) continue;
         for (const turned of top.rotate ? [false, true] : [false]) {
           const tL = turned ? top.outer.W : top.outer.L;
           const tW = turned ? top.outer.L : top.outer.W;
@@ -135,7 +138,6 @@ function makeUnits(crates: Crate[], sp: Space, s: Settings, stack: boolean): Uni
         }
       }
       if (!best) continue;
-      const own = top.stack ? pools.get(foot(top))! : alone;
       own.splice(own.indexOf(top), 1);
       const four = best.four;
       for (const c of four) best.pool.splice(best.pool.indexOf(c), 1);
@@ -163,8 +165,10 @@ function makeUnits(crates: Crate[], sp: Space, s: Settings, stack: boolean): Uni
     while (i < pool.length) {
       const tower: Crate[] = [];
       let H = 0;
-      while (i < pool.length && tower.length < tiers && H + pool[i].outer.H <= sp.H + E) {
+      let kg = 0;
+      while (i < pool.length && tower.length < tiers && H + pool[i].outer.H <= sp.H + E && (!tower.length || kg + pool[i].gross <= payload + E)) {
         H += pool[i].outer.H;
+        kg += pool[i].gross;
         tower.push(pool[i++]);
       }
       if (!tower.length) tower.push(pool[i++]); // too tall for the deck on its own: the loader flags it
@@ -187,18 +191,22 @@ function makeUnits(crates: Crate[], sp: Space, s: Settings, stack: boolean): Uni
 }
 
 /** Fills one row across the deck, led by `lead` in the given turn, with whatever else fits beside or behind within its depth. */
-function fillRow(lead: Unit, pool: Unit[], sp: Space, gap: number): { row: InRow[]; used: Set<Unit> } {
+function fillRow(lead: Unit, pool: Unit[], sp: Space, gap: number, payload: number): { row: InRow[]; used: Set<Unit> } {
   const depth = lead.L;
   const free = new MaxRects({ x: 0, y: 0, w: depth + gap, h: sp.W + gap });
   const row: InRow[] = [];
   const used = new Set<Unit>();
+  let kg = 0;
   const put = (u: Unit, orig: Unit, mayTurn: boolean) => {
+    // a row never weighs more than the vehicle may carry: it has to go on one vehicle whole
+    if (row.length && kg + u.kg > payload + E) return false;
     const spot = free.find(u.L + gap, u.W + gap, mayTurn, mayTurn ? 'fit' : 'corner');
     if (!spot) return false;
     free.place(spot);
     const turned = spot.turned;
     row.push({ u: turned ? turn(u) : u, x: spot.x, y: spot.y, turned });
     used.add(orig);
+    kg += u.kg;
     return true;
   };
   put(lead, pool[0], false);
@@ -206,22 +214,24 @@ function fillRow(lead: Unit, pool: Unit[], sp: Space, gap: number): { row: InRow
   return { row, used };
 }
 
-function makeRows(units: Unit[], sp: Space, gap: number): Row[] {
+function makeRows(units: Unit[], sp: Space, gap: number, payload: number): { rows: Row[]; dropped: Unit[] } {
   let pool = [...units].sort((a, b) => Math.max(b.L, b.W) - Math.max(a.L, a.W) || b.kg - a.kg);
   const rows: Row[] = [];
+  const dropped: Unit[] = [];
   while (pool.length) {
     const lead = pool[0];
     // lead across the deck when it fits that way (shallower row), else along it; keep the fuller row
     const options = (lead.rotate ? [lead.L <= lead.W ? lead : turn(lead), lead.L <= lead.W ? turn(lead) : lead] : [lead]).filter((u) => u.W <= sp.W + E && u.L <= sp.L + E);
     let best: { row: InRow[]; used: Set<Unit>; depth: number; density: number } | null = null;
     for (const o of options) {
-      const r = fillRow(o, pool, sp, gap);
+      const r = fillRow(o, pool, sp, gap, payload);
       const depth = Math.max(...r.row.map((p) => p.x + p.u.L));
       const area = r.row.reduce((a, p) => a + p.u.L * p.u.W, 0);
       const density = area / (depth * sp.W);
       if (!best || density > best.density + 1e-9) best = { ...r, depth, density };
     }
     if (!best) {
+      dropped.push(lead);
       pool = pool.slice(1);
       continue;
     }
@@ -239,7 +249,7 @@ function makeRows(units: Unit[], sp: Space, gap: number): Row[] {
     });
     pool = pool.filter((u) => !best!.used.has(u));
   }
-  return rows;
+  return { rows, dropped };
 }
 
 /**
@@ -300,7 +310,8 @@ function plan(crates: Crate[], v: Vehicle, s: Settings, stack: boolean): LoadRes
     else if (c.gross > v.payload) stranded.push({ crate: c.id, why: `${Math.round(c.gross)} kg, over the payload` });
     else ok.push(c);
   }
-  const rows = makeRows(makeUnits(ok, sp, s, stack), sp, s.deckGap);
+  const { rows, dropped } = makeRows(makeUnits(ok, sp, s, stack, v.payload), sp, s.deckGap, v.payload);
+  for (const u of dropped) for (const m of u.members) stranded.push({ crate: m.crate.id, why: `does not fit on the ${v.name} deck` });
 
   // rows onto vehicles: first one with length and payload left
   const bins: { rows: Row[]; length: number; kg: number }[] = [];
