@@ -63,6 +63,7 @@ npm install
 npm run dev            # http://localhost:5173 while developing
 npm test               # planner rules, the works' history score (and Book1.xlsx, when it is in the folder)
 npm run tune           # re-tune the crate settings to the works' history (about 2 minutes)
+npm run scorecard      # scorecard/WaveForce-scorecard.xlsx: the planner's crates against the real boxes, order by order and line by line
 npm run build          # dist/: index.html (the whole app), sw.js, manifest, icon
 npm run build:artifact # dist-artifact/waveforce.html for claude.ai
 npx wrangler pages deploy dist --project-name waveforce --branch main
