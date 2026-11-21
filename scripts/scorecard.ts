@@ -10,20 +10,17 @@
  * formulas) is written by scripts/scorecard.py.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { CRATE_SIZES, DEFAULTS } from '../app/model/presets';
+import { DEFAULTS } from '../app/model/presets';
 import type { Crate } from '../app/model/types';
 import data from '../app/pack/history.json';
-import { cratesFor, orderLines, scoreOrder, type Order } from '../app/pack/history';
+import { boxSizes, cratesFor, orderLines, scoreOrder, type Order } from '../app/pack/history';
 
 const IN = 25.4;
 const orders = (data as unknown as Order[]).filter((o) => o.split !== 'excluded');
 
-// each order as if it were new: its own box sizes off the standard list, unless another order used the same size
-const key = (b: { L: number; W: number; H: number }) => `${b.L}x${b.W}x${b.H}`;
-const sizesOf = (o: Order) => new Set(o.boxes.filter((b) => b.L).map((b) => key({ L: b.L, W: b.B, H: b.H })));
-const used = new Map<string, number>();
-for (const o of orders) for (const k of sizesOf(o)) used.set(k, (used.get(k) ?? 0) + 1);
-const asNew = (o: Order) => scoreOrder(o, { ...DEFAULTS, crateSizes: CRATE_SIZES.filter((b) => !sizesOf(o).has(key(b)) || used.get(key(b))! > 1) }).score;
+// each order scored as a new one: the standard sizes are the train orders' box sizes, less its own (history.ts, scoreAsNew)
+const train = orders.filter((o) => o.split === 'train');
+const settingsFor = (o: Order) => (DEFAULTS.useSizes ? { ...DEFAULTS, crateSizes: boxSizes(train.filter((x) => x.prn !== o.prn)) } : DEFAULTS);
 
 const range = (t: string) => {
   const [a, b] = t.split('-').map(Number);
@@ -47,8 +44,8 @@ const fit = (a: Dims, b: Dims) => ratio(a.L, b.L) * ratio(a.B, b.B) * ratio(a.H,
 
 const out = orders.map((o) => {
   const { lines, unread } = orderLines(o);
-  const crates = cratesFor(lines, DEFAULTS);
-  const check = scoreOrder(o, DEFAULTS);
+  const crates = cratesFor(lines, settingsFor(o));
+  const check = scoreOrder(o, settingsFor(o));
 
   // real boxes as the history test counts them: a box holding only lines the planner cannot read is left out
   const readBoxes = new Set<number>();
@@ -105,7 +102,6 @@ const out = orders.map((o) => {
     })),
     lines: lineRows,
     score,
-    asNew: DEFAULTS.useSizes ? asNew(o) : null,
   };
 });
 

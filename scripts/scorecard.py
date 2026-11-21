@@ -151,7 +151,7 @@ ln["U1"].comment = Comment("Yes when the planned crate is within the tolerance o
 
 # ---------------------------------------------------------------- Orders: one row per order
 od = wb.create_sheet("Orders")
-cols = ["PRN", "Customer", "Date", "Set", "Real boxes", "Planned crates", "Right number of boxes?", "Order score", "Real gross (kg)", "Planned gross (kg)", "Gasket lines", "Lines within tolerance", "Line match", "Score as a new order"]
+cols = ["PRN", "Customer", "Date", "Set", "Real boxes", "Planned crates", "Right number of boxes?", "Order score", "Real gross (kg)", "Planned gross (kg)", "Gasket lines", "Lines within tolerance", "Line match"]
 header(od, 1, cols)
 for i, o in enumerate(orders):
     r = i + 2
@@ -169,23 +169,19 @@ for i, o in enumerate(orders):
     od.cell(row=r, column=11, value=f"=COUNTIF({L},A{r})")
     od.cell(row=r, column=12, value=f'=COUNTIFS({L},A{r},Lines!$U$2:$U${last_line},"Yes")')
     od.cell(row=r, column=13, value=f"=IF(K{r}=0,0,L{r}/K{r})")
-    od.cell(row=r, column=14, value=None if o.get("asNew") is None else o["asNew"] / 100)
 last_order = len(orders) + 1
-style_body(od, 2, last_order, len(cols), {8: SCORE_FILL, 13: SCORE_FILL, 14: SCORE_FILL})
+style_body(od, 2, last_order, len(cols), {8: SCORE_FILL, 13: SCORE_FILL})
 for rr in range(2, last_order + 1):
     od.cell(row=rr, column=8).number_format = "0.0%"
     od.cell(row=rr, column=13).number_format = "0%"
-    od.cell(row=rr, column=14).number_format = "0.0%"
     od.cell(row=rr, column=9).number_format = "#,##0"
     od.cell(row=rr, column=10).number_format = "#,##0"
 fit_scale(od, f"H2:H{last_order}")
-fit_scale(od, f"N2:N{last_order}")
 od.conditional_formatting.add(f"G2:G{last_order}", FormulaRule(formula=['G2="Yes"'], fill=GOOD))
 od.conditional_formatting.add(f"G2:G{last_order}", FormulaRule(formula=['G2="No"'], fill=BAD))
-widths(od, [11, 30, 11, 9, 8, 9, 11, 9, 10, 10, 8, 10, 9, 11])
+widths(od, [11, 30, 11, 9, 8, 9, 11, 9, 10, 10, 8, 10, 9])
 od.freeze_panes = "B2"
-od.auto_filter.ref = f"A1:N{last_order}"
-od["N1"].comment = Comment("The order's score when its own box sizes are taken off the standard list first (unless another order used the same size), as for a new order whose exact box is not on the list. Worked out by the planner (scripts/scorecard.ts), not by a formula: the planner itself has to run without those sizes.", "WaveForce")
+od.auto_filter.ref = f"A1:M{last_order}"
 od["H1"].comment = Comment("Total box fit of the order's pairs (Boxes sheet) over the larger of the two box counts. 100 % = same number of boxes at the same sizes.", "WaveForce")
 od["I1"].comment = Comment("Blank real weights (order 261000021, boxes 6 and 7) are not on the packing list and count as 0 here.", "WaveForce")
 
@@ -213,7 +209,7 @@ sm["B6"].alignment = Alignment(vertical="top")
 sm["C6"].alignment = Alignment(horizontal="center", vertical="top")
 sm["C6"].comment = Comment("Input: the only cell on this sheet meant to be edited. 10 % is a starting point chosen for this score card, not a works rule.", "WaveForce")
 
-cols = ["", "Orders", "Box score", "Right number of boxes", "Gasket lines", "Lines within tolerance", "Line match", "Average line size fit", "Box score as a new order"]
+cols = ["", "Orders", "Box score", "Right number of boxes", "Gasket lines", "Lines within tolerance", "Line match", "Average line size fit"]
 for i, name in enumerate(cols[1:], 3):
     c = sm.cell(row=8, column=i, value=name)
     c.font = HEAD
@@ -238,12 +234,11 @@ for i, (name, crit) in enumerate(rows):
     sm.cell(row=r, column=7, value=f'=COUNTIFS({LS},{crit},Lines!$U$2:$U${last_line},"Yes")')
     sm.cell(row=r, column=8, value=f"=IF(F{r}=0,0,G{r}/F{r})")
     sm.cell(row=r, column=9, value=f"=AVERAGEIF({LS},{crit},Lines!$T$2:$T${last_line})")
-    sm.cell(row=r, column=10, value=f"=AVERAGEIF({O},{crit},Orders!$N$2:$N${last_order})")
-    for c in range(2, 11):
+    for c in range(2, 10):
         cell = sm.cell(row=r, column=c)
         cell.font = BOLD if c in (4, 8) else BASE
         cell.border = BOX
-    for c in (4, 5, 8, 9, 10):
+    for c in (4, 5, 8, 9):
         sm.cell(row=r, column=c).number_format = "0.0%"
     sm.cell(row=r, column=4).fill = SCORE_FILL
     sm.cell(row=r, column=8).fill = SCORE_FILL
@@ -254,9 +249,9 @@ notes = [
     ("Box score", "For each order the planner packs the lines; its crates and the real boxes are each sorted biggest first and paired off. A pair scores long side match × short side match × height match, each match being the smaller size over the larger (Boxes sheet). A box with no partner scores 0. The order's score is its pairs' total over the larger box count, so 100 % means the same number of boxes at the same sizes. This is the score the test suite (npm test) checks."),
     ("Line match", "Each gasket line is followed into the crate the planner put it in and compared with the box the works used for it (Lines sheet). It is matched when every side is within the tolerance above."),
     ("Average line size fit", "The same size comparison as a box, per line: 100 % when the line's planned crate is exactly its real box."),
-    ("Standard sizes", "Crates are picked from a list of standard sizes (every box size on the packing check lists) instead of made to measure: each is the smallest size that takes its gaskets, and only gaskets no standard size takes get a custom crate (Boxes sheet, last column). The box allowances (side 3 mm, floor and lid 10 mm, gap 3 mm, under the lid 15 mm) were calibrated on the 19 tuning orders only."),
-    ("Box score as a new order", "Every order's own sizes are on the list, so the Box score can find the very box it is scored against. The last column takes each order's own sizes off the list first (unless another order used the same size): that is how the planner does for a new order whose exact box is not on the list, and the fairest figure to judge it by."),
-    ("Tuning vs held out", "The settings were tuned on the 19 tuning orders. The 5 held-out orders were never used for tuning, so their scores are the best guide to how the planner does on orders it has not seen."),
+    ("Standard sizes", "Crates are picked from a list of standard sizes instead of made to measure: each is the smallest size that takes its gaskets; a gasket of 800 mm or more shares its box only with gaskets close to its size, and only gaskets no standard size takes get a custom crate (Boxes sheet, last column). Settings tuned on the train orders only (npm run tune:sizes)."),
+    ("Scored as new orders", "Every order is scored as a new one would be: the list of standard sizes is the train orders' box sizes, without the order's own, so it finds its own box only if another order used the same size. Held-out orders are scored with the train orders' sizes only. The website itself offers every size of the history."),
+    ("Tuning vs held out", "The settings were tuned on the 58 tuning orders. The 25 held-out orders were never used for tuning, so their scores are the best guide to how the planner does on orders it has not seen."),
     ("Why an order can miss its own box", "Even with its own box on the list, an order scores below 100 % when (a) the gaskets also fit a smaller standard box, which the planner picks while the packer used the bigger one (e.g. two R11 rings: 4×4×4 fits, the packer used 4×4×9 in 261000014); (b) the packer split the order into more boxes than needed, one per big gasket size (261000005, 010, 015, 022, 029); or (c) the real box is a few millimetres tighter than the planner allows (261000002, 004, 028). No fixed rule can match (a) and (b) every time, because the packing lists themselves are not consistent: that is why 98–99 % cannot be reached."),
     ("Sizes", "All box sizes are in inches, long side first, as written on the packing check lists; planned sizes are the planner's crates with the shipped settings. The calibration fits best when the written sizes are taken as almost the inside of the box (3 mm a side), so they may be inside sizes: worth confirming with the crate makers."),
     ("Left out", "Order 261000001 (a rubber sheet roll with no box). In 261000021 the R96 ring is beyond the planner's ring table, so the box holding only it is left out."),
@@ -272,7 +267,7 @@ for title, text in notes:
         sm.cell(row=r, column=3).alignment = WRAP
         sm.row_dimensions[r].height = 13.5 * max(1, -(-len(text) // 78)) + 6
     r += 1
-widths(sm, [2, 24, 9, 11, 13, 10, 12, 10, 12, 12])
+widths(sm, [2, 24, 9, 11, 13, 10, 12, 10, 12])
 sm.sheet_view.showGridLines = False
 
 for ws in wb.worksheets:

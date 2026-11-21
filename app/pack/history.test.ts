@@ -63,5 +63,5 @@ describe("the works' packing history", () => {
   });
 });
 
-// the shipped defaults reached: made to measure 38.6 train / 41.0 test; standard sizes 40.4 / 42.9
-const FLOOR = { madeTrain: 37.6, madeTest: 40, sizesTrain: 39.4, sizesTest: 41.9 };
+// the shipped defaults reached: made to measure 38.6 train / 41.0 test; standard sizes 46.8 / 43.9 (tuned: npm run tune:sizes)
+const FLOOR = { madeTrain: 37.6, madeTest: 40, sizesTrain: 45.8, sizesTest: 42.9 };

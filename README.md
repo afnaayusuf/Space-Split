@@ -91,7 +91,7 @@ vehicles under Settings.
 ## Tuned to the works' packing history
 
 The crate settings are tuned to how the works really packed: `app/pack/history.json`
-holds 25 orders (PRN 261000001–030) read off their signed packing check lists — every
+holds 85 orders (PRN 261000001–102) read off their signed packing check lists — every
 line with its box number, and every box's outside size in inches and gross weight.
 
 **The score.** For each order the planner packs the lines and its crates are paired
@@ -139,13 +139,15 @@ Large Series B spiral wound (ASME B16.47 B, class 150, 26–36″) are read from
 ASME B16.20 sizes; they are not on the works' chart, so check them and add weights.
 
 **Standard crate sizes.** Crates are picked from a list of standard sizes (Settings →
-Crates · standard sizes; it starts as every box size on the packing check lists), so the
-crate makers build the same boxes again and again. Each crate is the smallest size on the
-list that takes its gaskets; a gasket no size takes gets a crate made to measure, marked
-**Custom** in the plan. The box allowances (side 3 mm, floor and lid 10 mm, 3 mm between
-stacks, 15 mm under the lid) were calibrated on the train orders only. With standard sizes
-the history scores 66.4 (train) and 47.9 (test); with each order's own sizes taken off the
-list, as for a new order, 45.4 and 44.2. Switch it off for crates made to measure.
+Crates · standard sizes; it starts as every box size on the packing check lists that fits
+across a deck), so the crate makers build the same boxes again and again. Each crate is
+the smallest size on the list that takes its gaskets; a gasket of 800 mm or more shares
+its box only with gaskets close to its size; a gasket no size takes gets a crate made to
+measure, marked **Custom** in the plan. `npm run tune:sizes` tunes these settings on the
+train orders, every order scored as a new one would be (the other train orders' sizes
+only), with cross-validation to keep it from chasing noise. On the 85-order history:
+46.8 train, **43.9 test** (made to measure: 38.6 / 41.0). Switch it off for crates made to
+measure.
 
 **Vehicle type.** The list holds the common Indian bodies (Tata Ace, pickup,
 Tata 407, 14 / 17 / 19 / 20 / 22 / 24 ft, 32 ft SXL / MXL, 20 / 40 ft
