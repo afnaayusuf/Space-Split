@@ -170,7 +170,10 @@ function makeCrate(n: number, b: StdSize, fit: Fit, s: Settings): Crate {
 
 /** Packs the squares into standard sizes; a square no standard box takes gets a crate made to measure. */
 export function packStandard(groups: Group[], s: Settings, deckW: number, sizes: StdSize[]): Crate[] {
-  const boxes = [...sizes].filter((b) => b.L > 0 && b.W > 0 && b.H > 0).sort((a, b) => a.L * a.W * a.H - b.L * b.W * b.H);
+  // a box must go across the deck (its short side), or no vehicle could carry it
+  const boxes = [...sizes]
+    .filter((b) => b.L > 0 && b.W > 0 && b.H > 0 && Math.min(b.L, b.W) * IN <= deckW + 1e-6)
+    .sort((a, b) => a.L * a.W * a.H - b.L * b.W * b.H);
   let left = [...groups].sort((a, b) => b.side - a.side || b.h - a.h);
   const crates: Crate[] = [];
   while (left.length) {
