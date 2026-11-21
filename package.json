@@ -12,7 +12,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "tune": "vite-node app/pack/tune.ts",
-    "scorecard": "vite-node scripts/scorecard.ts && python3 scripts/scorecard.py"
+    "scorecard": "vite-node scripts/scorecard.ts && python3 scripts/scorecard.py",
+    "tune:sizes": "vite-node app/pack/tuneSizes.ts"
   },
   "dependencies": {
     "react": "19.1.0",

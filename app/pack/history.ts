@@ -145,7 +145,33 @@ export interface SetScore {
 }
 
 export function scoreSet(orders: Order[], s: Settings): SetScore {
-  const out = orders.map((o) => scoreOrder(o, s));
+  return summarize(orders.map((o) => scoreOrder(o, s)));
+}
+
+/** Every box size the works used in these orders (inches, long side first), smallest first: a list of standard sizes. */
+export function boxSizes(orders: Order[]): { L: number; W: number; H: number }[] {
+  const seen = new Map<string, { L: number; W: number; H: number }>();
+  for (const o of orders)
+    for (const b of o.boxes) {
+      if (!(b.L > 0 && b.B > 0 && b.H > 0)) continue;
+      const [L, W] = [b.L, b.B].sort((x, y) => y - x);
+      seen.set(`${L}x${W}x${b.H}`, { L, W, H: b.H });
+    }
+  return [...seen.values()].sort((a, b) => a.L * a.W * a.H - b.L * b.W * b.H);
+}
+
+/**
+ * Each order scored as a new order would be: with standard sizes, the list is
+ * the box sizes of the `pool` orders other than the order itself, so it can
+ * only find its own box if another order used the same size. Test orders are
+ * scored with the train orders as the pool; train orders, leave one out.
+ */
+export function scoreAsNew(orders: Order[], pool: Order[], s: Settings): SetScore {
+  if (!s.useSizes) return scoreSet(orders, s);
+  return summarize(orders.map((o) => scoreOrder(o, { ...s, crateSizes: boxSizes(pool.filter((x) => x.prn !== o.prn)) })));
+}
+
+function summarize(out: OrderScore[]): SetScore {
   const pairs = out.flatMap((o) => o.pairs).filter((p) => p.real && p.plan);
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   return {
