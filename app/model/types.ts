@@ -85,6 +85,9 @@ export interface Settings {
   sizeBase?: number; // a standard box's floor and lid together (mm)
   sizeGap?: number; // in a standard box: between stacks and to the walls (mm)
   sizeTop?: number; // in a standard box: above the tallest stack (mm)
+  sizePick?: 'volume' | 'fill'; // when no standard box takes everything left: the one taking the most, or the one it fills best
+  sizeAlone?: number; // a gasket this wide (mm) or more shares its box only with gaskets close to its size; 0 = off
+  sizeFill?: number; // a standard box is filled to at most this share of its inside; 0 = no limit
   /** On the vehicle. */
   deckWall: number;
   deckGap: number;

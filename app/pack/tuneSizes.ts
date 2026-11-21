@@ -23,7 +23,7 @@ const orders = data as unknown as Order[];
 const train = orders.filter((o) => o.split === 'train');
 const test = orders.filter((o) => o.split === 'test');
 
-type Value = number | boolean;
+type Value = number | boolean | string;
 const SPACE: Partial<Record<keyof Settings, Value[]>> = {
   sizeWall: [0, 2, 3, 5, 8, 12],
   sizeBase: [0, 5, 10, 15, 20, 30],
@@ -39,6 +39,9 @@ const SPACE: Partial<Record<keyof Settings, Value[]>> = {
   ring: [2, 5, 10, 15, 25],
   nest: [false, true],
   onTop: [0, 0.3, 0.5, 0.7],
+  sizePick: ['volume', 'fill'] as unknown as Value[],
+  sizeAlone: [0, 400, 600, 800, 1000, 1400],
+  sizeFill: [0, 0.3, 0.4, 0.5, 0.6, 0.8],
 };
 const KNOBS = Object.keys(SPACE) as (keyof Settings)[];
 const START: Settings = { ...DEFAULTS, useSizes: true };

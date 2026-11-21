@@ -64,6 +64,29 @@ export function describe(text: string): Described {
     out.od = num(m[1]);
     out.bore = num(m[4]);
   }
+  // NS with fewer sizes: (OD X ID), (OD X winding X ID), (a X b) X (c X d); an elliptical one (long X short) has no bore to nest in
+  if (!out.od && /\bNS\b/.test(s)) {
+    m = /\bNS\s*((?:\(\s*[\d.\sX]+\)\s*X?\s*)+)/.exec(s);
+    const sizes = m ? (m[1].match(/\d+(?:\.\d+)?/g) ?? []).map(num).filter((v) => v > 0) : [];
+    if (sizes.length >= 2) {
+      out.od = Math.max(...sizes);
+      out.bore = /ELLIP/.test(s) ? 0 : Math.min(...sizes);
+    }
+  }
+  // D shape, as per drawing: OUTERRADIUS / INNERRADIUS; taken as the ring round its outer radius, a little room to spare
+  m = new RegExp(String.raw`${N}\s*MM\s*OUTER\s*RADIUS`).exec(s);
+  if (m && !out.od) {
+    out.od = 2 * num(m[1]);
+    const r = new RegExp(String.raw`${N}\s*MM\s*INNER\s*RADIUS`).exec(s);
+    out.bore = r ? 2 * num(r[1]) : 0;
+  }
+  // rectangular and square sheets: 1164 MM LENGTH X 1174 MM WIDTH, 1198 MM WIDTH X 569 MM HEIGHT, 1.5 M LENGTH, 600 SQ
+  if (!out.od) {
+    const sides: number[] = [];
+    const re = new RegExp(String.raw`${N}\s*(MM|M)?\s*(?:LENGTH|WIDTH|HEIGHT|SQ(?:UARE)?)\b`, 'g');
+    for (let r = re.exec(s); r; r = re.exec(s)) sides.push(num(r[1]) * (r[2] === 'M' ? 1000 : 1));
+    if (sides.length) out.od = Math.max(...sides);
+  }
   // plain 222.3 X 157.2 X 4.5
   if (!out.od) {
     m = new RegExp(String.raw`\s${N}\s*X\s*${N}\s*X\s*${N}\s*(?:MM)?\s`).exec(s);
@@ -80,6 +103,8 @@ export function describe(text: string): Described {
   // class: 150#, CL300, CLASS 600, RATING 600, 900LB
   m = /(\d{3,4})\s*(?:#|LBS?\b)/.exec(s) ?? /\b(?:CL(?:ASS)?|RATING)\.?\s*(\d{3,4})\b/.exec(s);
   if (m) out.rating = num(m[1]);
+  // class 125 (cast iron flanges) takes the class 150 gasket
+  if (out.rating === 125) out.rating = 150;
 
   m = /\b(RX|BX|R)\s*-?\s*(\d{2,3})\b/.exec(s);
   if (m && (/\bRTJ\b|RING\s*JOINT/.test(s) || m[1] !== 'R')) out.ringNo = `${m[1]}${m[2]}`;

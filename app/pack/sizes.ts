@@ -38,6 +38,11 @@ interface Fit {
 
 /** What of `groups` (largest first) fits in a box `inner`, laid out `flat` or stacked. */
 function fitInto(groups: Group[], inner: { L: number; W: number; H: number }, s: Settings, flat: boolean): Fit {
+  // a big gasket's box carries only squares close to its size: smaller ones go in a box of their own
+  const lead = groups[0]?.side ?? 0;
+  const alone = (s.sizeAlone ?? 0) > 0 && lead >= s.sizeAlone!;
+  // room left in a box: no more than `sizeFill` of its inside in gaskets
+  const room = (s.sizeFill ?? 0) > 0 ? s.sizeFill! * inner.L * inner.W * inner.H : Infinity;
   // standard boxes are packed as the works packs them, closer than a crate made to measure
   const pile = s.sizeGap ?? s.pile;
   const wall = s.sizeGap ?? s.wall;
@@ -100,7 +105,7 @@ function fitInto(groups: Group[], inner: { L: number; W: number; H: number }, s:
 
   for (let i = 0; i < groups.length; i++) {
     const g = groups[i];
-    if (g.h > hc + 1e-6 || (used.size && net + g.kg > s.crateMaxKg + 1e-6)) {
+    if (g.h > hc + 1e-6 || (used.size && (net + g.kg > s.crateMaxKg + 1e-6 || vol + g.side * g.side * g.h > room || (alone && g.side < 0.8 * lead)))) {
       if (i === 0) break; // the box is chosen for the first square: no use going on without it
       continue;
     }
@@ -179,7 +184,10 @@ export function packStandard(groups: Group[], s: Settings, deckW: number, sizes:
         const all = fit.used.size === left.length;
         const bestAll = best !== null && best.fit.used.size === left.length;
         // the smallest box taking everything; failing that, the one taking the most (volume), the smaller on a tie
-        if (!best || (all && !bestAll) || (!bestAll && !all && fit.vol > best.fit.vol * 1.02)) best = { b, fit };
+        // the box it fills best, or the one taking the most, the smaller on a tie
+        const share = (f: Fit, x: StdSize) => f.vol / (x.L * x.W * x.H);
+        const better = s.sizePick === 'fill' ? best !== null && share(fit, b) > share(best.fit, best.b) * 1.02 : best !== null && fit.vol > best.fit.vol * 1.02;
+        if (!best || (all && !bestAll) || (!bestAll && !all && better)) best = { b, fit };
       }
       if (best && best.fit.used.size === left.length) break; // boxes go smallest first: the first to take everything wins
     }
